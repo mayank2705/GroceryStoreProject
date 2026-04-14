@@ -26,7 +26,6 @@ dist-ssr
 # Python
 __pycache__/
 *.py[cod]
-mohit_store.db
 
 # Env
 .env
