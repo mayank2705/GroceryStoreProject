@@ -22,11 +22,9 @@ def seed_database():
             
     try:
         df_filtered = df[df['Category'].isin(relevant_categories)].dropna(subset=['ProductName', 'DiscountPrice'])
-        sample_size = min(200, len(df_filtered))
-        df_sample = df_filtered.sample(n=sample_size, random_state=42)
 
         categories_dict = {}
-        for cat_name in df_sample['Category'].unique():
+        for cat_name in df_filtered['Category'].unique():
             cat = db.query(Category).filter(Category.name == cat_name).first()
             if not cat:
                 cat = Category(name=cat_name, image_url=None)
@@ -39,7 +37,7 @@ def seed_database():
         db.commit()
 
         products_to_add = []
-        for index, row in df_sample.iterrows():
+        for index, row in df_filtered.iterrows():
             cat_name = row['Category']
             cat_id = categories_dict[cat_name]
             
