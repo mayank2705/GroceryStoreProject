@@ -1,16 +1,12 @@
 {
-  "builds": [
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/vite"
+      "source": "/api/(.*)",
+      "destination": "/api/main.py"
     },
     {
-      "src": "api/main.py",
-      "use": "@vercel/python"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/main.py" },
-    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
