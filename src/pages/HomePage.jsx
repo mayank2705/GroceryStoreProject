@@ -18,7 +18,7 @@ export default function HomePage() {
 
     const [cartOpen, setCartOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const { addItem, removeItem, items: cartItems, getTotalItems, getTotalPrice } = useCartStore();
+    const { addItem, removeItem, items: cartItems, getTotalItems, getTotal: getTotalPrice } = useCartStore();
     const { user, token, setUser, logout } = useAuthStore();
 
     const observer = useRef();
