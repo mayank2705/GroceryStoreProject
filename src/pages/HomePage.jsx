@@ -1,38 +1,24 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
 import { useCartStore, useAuthStore } from '../store';
 import CartSidebar from '../components/CartSidebar';
 import HeroCarousel from '../components/HeroCarousel';
 import CategorySlider from '../components/CategorySlider';
+import CategoryRow from '../components/CategoryRow';
+import Footer from '../components/Footer';
 
 export default function HomePage() {
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [activeCategory, setActiveCategory] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
-    const [offset, setOffset] = useState(0);
-    const LIMIT = 20;
+    const LIMIT = 50;
 
     const [cartOpen, setCartOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { addItem, removeItem, items: cartItems, getTotalItems, getTotal: getTotalPrice } = useCartStore();
     const { user, token, setUser, logout } = useAuthStore();
-
-    const observer = useRef();
-    const lastProductElementRef = useCallback(node => {
-        if (loading || loadingMore) return;
-        if (observer.current) observer.current.disconnect();
-        observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMore) {
-                setOffset(prev => prev + LIMIT);
-            }
-        });
-        if (node) observer.current.observe(node);
-    }, [loading, loadingMore, hasMore]);
-
 
     useEffect(() => {
         fetchInitialData();
@@ -41,46 +27,19 @@ export default function HomePage() {
         }
     }, [token]);
 
-    // Listen to offset change to fetch more
-    useEffect(() => {
-        if (offset > 0) {
-            fetchMoreProducts();
-        }
-    }, [offset]);
-
     const fetchInitialData = async () => {
         setLoading(true);
-        setHasMore(true);
-        setOffset(0);
         try {
             const [cats, prods] = await Promise.all([
                 api.getCategories(),
-                api.getProducts(activeCategory, LIMIT, 0)
+                api.getProducts(null, LIMIT, 0)
             ]);
             setCategories(cats);
             setProducts(prods);
-            if (prods.length < LIMIT) setHasMore(false);
         } catch (err) {
             console.error('Failed to load data:', err);
         }
         setLoading(false);
-    };
-
-    const fetchMoreProducts = async () => {
-        if (!hasMore) return;
-        setLoadingMore(true);
-        try {
-            const newProds = await api.getProducts(activeCategory, LIMIT, offset);
-            if (newProds.length === 0) {
-                setHasMore(false);
-            } else {
-                setProducts(prev => [...prev, ...newProds]);
-                if (newProds.length < LIMIT) setHasMore(false);
-            }
-        } catch (err) {
-            console.error('Failed to load more products:', err);
-        }
-        setLoadingMore(false);
     };
 
     const loadProfile = async () => {
@@ -94,17 +53,30 @@ export default function HomePage() {
 
     const handleCategoryClick = async (catId) => {
         setActiveCategory(catId);
-        setOffset(0);
-        setHasMore(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        if (!catId) {
+            setLoading(true);
+            try {
+                const prods = await api.getProducts(null, LIMIT, 0);
+                setProducts(prods);
+            } catch (err) { console.error(err); }
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
             const prods = await api.getProducts(catId, LIMIT, 0);
             setProducts(prods);
-            if (prods.length < LIMIT) setHasMore(false);
         } catch (err) {
             console.error(err);
         }
         setLoading(false);
+    };
+
+    const handleSeeAll = (catId) => {
+        handleCategoryClick(catId);
     };
 
     const getItemQty = (productId) => {
@@ -118,13 +90,14 @@ export default function HomePage() {
         )
         : products;
 
+    const isGridMode = activeCategory !== null || searchQuery !== '';
+
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Blinkit Style Sticky Header */}
-            <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+            <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm shrink-0">
                 <div className="max-w-7xl mx-auto px-4 py-3">
                     <div className="flex flex-col gap-3">
-                        {/* Top row: Location & Profile/Cart */}
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity">
                                 <div className="flex items-center gap-1">
@@ -164,7 +137,6 @@ export default function HomePage() {
                             </div>
                         </div>
 
-                        {/* Search Bar */}
                         <div className="relative">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -182,12 +154,10 @@ export default function HomePage() {
                 </div>
             </header>
 
-            {/* Hero Carousel */}
             {!searchQuery && <HeroCarousel />}
 
-            {/* Category Slider */}
             {!searchQuery && (
-                <div className="bg-white mt-1 mb-2 py-3 border-y border-gray-100">
+                <div className="bg-white mt-1 mb-3 py-2 border-y border-gray-100 shrink-0">
                     <CategorySlider 
                         categories={categories} 
                         activeCategory={activeCategory} 
@@ -196,120 +166,124 @@ export default function HomePage() {
                 </div>
             )}
 
-            {/* Products Grid */}
-            <main className="max-w-7xl mx-auto px-4 py-4">
-                {activeCategory && (
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">
-                        {categories.find((c) => c.id === activeCategory)?.name}
-                    </h2>
-                )}
+            <main className="max-w-7xl mx-auto w-full flex-1">
+                {isGridMode ? (
+                    <div className="px-4 pb-12 pt-2">
+                        {activeCategory && (
+                            <h2 className="text-xl font-extrabold text-gray-900 mb-4 tracking-tight px-1">
+                                {categories.find((c) => c.id === activeCategory)?.name}
+                            </h2>
+                        )}
 
-                {loading ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                        {[...Array(10)].map((_, i) => (
-                            <div key={i} className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
-                                <div className="w-full aspect-square shimmer rounded-lg" />
-                                <div className="h-3 shimmer rounded w-3/4" />
-                                <div className="h-8 shimmer rounded mt-2" />
+                        {loading ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                                {[...Array(10)].map((_, i) => (
+                                    <div key={i} className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
+                                        <div className="w-full aspect-square shimmer rounded-lg" />
+                                        <div className="h-3 shimmer rounded w-3/4" />
+                                        <div className="h-8 shimmer rounded mt-2" />
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                        <AnimatePresence>
-                            {filteredProducts.map((product, index) => {
-                                const qty = getItemQty(product.id);
-                                const isLastElement = index === filteredProducts.length - 1;
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                                <AnimatePresence>
+                                    {filteredProducts.map((product) => {
+                                        const qty = getItemQty(product.id);
 
-                                return (
-                                    <div
-                                        key={product.id}
-                                        ref={isLastElement ? lastProductElementRef : null}
-                                        className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors duration-200 overflow-hidden relative flex flex-col"
-                                    >
-                                        {/* Product Image */}
-                                        <div className="relative p-2 flex items-center justify-center aspect-square bg-white">
-                                            <img
-                                                src={product.image_url}
-                                                alt={product.name}
-                                                loading="lazy"
-                                                className="w-full h-full object-contain mix-blend-multiply"
-                                                onError={(e) => {
-                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.name)}&background=f0fdf4&color=0c831f&font-size=0.33`;
-                                                }}
-                                            />
-                                            {/* Blinkit style clock badge */}
-                                            <div className="absolute bottom-2 left-2 bg-gray-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm border border-black/5">
-                                                <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                <span className="text-[10px] font-bold text-gray-800">8 MINS</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Product Details */}
-                                        <div className="p-3 flex flex-col flex-1">
-                                            <h3 className="text-[13px] font-semibold text-gray-800 leading-tight mb-1 line-clamp-2 min-h-[32px]">
-                                                {product.name}
-                                            </h3>
-                                            <p className="text-[11px] text-gray-500 font-medium mb-3">{product.weight}</p>
-
-                                            <div className="mt-auto flex items-center justify-between">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-gray-900">
-                                                        ₹{product.price}
-                                                    </span>
+                                        return (
+                                            <div
+                                                key={product.id}
+                                                className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors duration-200 overflow-hidden relative flex flex-col shadow-sm"
+                                            >
+                                                <div className="relative p-2 flex items-center justify-center aspect-square bg-white">
+                                                    <img
+                                                        src={product.image_url}
+                                                        alt={product.name}
+                                                        loading="lazy"
+                                                        className="w-full h-full object-contain mix-blend-multiply"
+                                                        onError={(e) => {
+                                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(product.name)}&background=f0fdf4&color=0c831f&font-size=0.33`;
+                                                        }}
+                                                    />
+                                                    <div className="absolute bottom-2 left-2 bg-gray-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm border border-black/5">
+                                                        <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        <span className="text-[10px] font-bold text-gray-800">8 MINS</span>
+                                                    </div>
                                                 </div>
 
-                                                {/* Blinkit Style ADD Button Pill */}
-                                                {qty === 0 ? (
-                                                    <button
-                                                        onClick={() => addItem(product)}
-                                                        className="h-8 px-5 bg-brand-50 border border-brand-500 text-brand-600 font-bold text-xs rounded-lg hover:bg-brand-100 transition-colors shadow-sm"
-                                                    >
-                                                        ADD
-                                                    </button>
-                                                ) : (
-                                                    <div className="h-8 flex items-center bg-brand-500 rounded-lg shadow-sm w-20 justify-between px-1">
-                                                        <button
-                                                            onClick={() => removeItem(product.id)}
-                                                            className="w-6 h-6 flex items-center justify-center text-white font-bold text-lg leading-none"
-                                                        >
-                                                            -
-                                                        </button>
-                                                        <span className="text-white font-bold text-xs">
-                                                            {qty}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => addItem(product)}
-                                                            className="w-6 h-6 flex items-center justify-center text-white font-bold text-lg leading-none"
-                                                        >
-                                                            +
-                                                        </button>
+                                                <div className="p-3 flex flex-col flex-1 pb-4">
+                                                    <h3 className="text-[13px] font-semibold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[36px]">
+                                                        {product.name}
+                                                    </h3>
+                                                    <p className="text-[11px] text-gray-500 font-medium mb-3">{product.weight}</p>
+
+                                                    <div className="mt-auto flex items-center justify-between">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-bold text-gray-900">
+                                                                ₹{product.price}
+                                                            </span>
+                                                        </div>
+
+                                                        {qty === 0 ? (
+                                                            <button
+                                                                onClick={() => addItem(product)}
+                                                                className="h-8 px-4 bg-brand-50 border border-brand-200 text-brand-600 font-bold text-xs rounded-lg hover:bg-brand-100 hover:border-brand-500 transition-colors shadow-sm"
+                                                            >
+                                                                ADD
+                                                            </button>
+                                                        ) : (
+                                                            <div className="h-8 flex items-center bg-brand-500 rounded-lg shadow-sm w-16 justify-between px-1">
+                                                                <button
+                                                                    onClick={() => removeItem(product.id)}
+                                                                    className="w-5 h-5 flex items-center justify-center text-white font-bold text-lg leading-none"
+                                                                >
+                                                                    -
+                                                                </button>
+                                                                <span className="text-white font-bold text-xs">
+                                                                    {qty}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => addItem(product)}
+                                                                    className="w-5 h-5 flex items-center justify-center text-white font-bold text-lg leading-none"
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </AnimatePresence>
-                    </div>
-                )}
+                                        );
+                                    })}
+                                </AnimatePresence>
+                            </div>
+                        )}
 
-                {/* Loading More Spinner */}
-                {loadingMore && (
-                    <div className="flex justify-center py-6">
-                        <div className="w-8 h-8 rounded-full border-4 border-brand-200 border-t-brand-500 animate-spin" />
+                        {!loading && filteredProducts.length === 0 && (
+                            <div className="text-center py-20">
+                                <p className="text-gray-400 text-lg font-medium">No items found</p>
+                            </div>
+                        )}
                     </div>
-                )}
-
-                {!loading && filteredProducts.length === 0 && (
-                    <div className="text-center py-20">
-                        <p className="text-gray-400 text-lg font-medium">No items found</p>
+                ) : (
+                    <div className="flex flex-col pb-8">
+                        {loading && categories.length === 0 ? (
+                            <div className="flex justify-center py-20">
+                                <div className="w-8 h-8 rounded-full border-4 border-brand-200 border-t-brand-500 animate-spin" />
+                            </div>
+                        ) : (
+                            categories.slice(0, 10).map((cat) => (
+                                <CategoryRow key={cat.id} category={cat} onSeeAll={handleSeeAll} />
+                            ))
+                        )}
                     </div>
                 )}
             </main>
+
+            <Footer />
 
             {/* Desktop Cart Float */}
             <div className="hidden sm:block fixed right-6 bottom-6 z-40">
@@ -324,21 +298,21 @@ export default function HomePage() {
                 </button>
             </div>
 
-            {/* Standard Blinkit Sticky Bottom Cart Banner (Mobile) */}
+            {/* Sticky Bottom Cart Banner (Mobile) */}
             <AnimatePresence>
                 {getTotalItems() > 0 && !cartOpen && (
                     <motion.div
                         initial={{ y: 100, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 100, opacity: 0 }}
-                        className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:hidden bg-white/80 backdrop-blur-md border-t border-gray-100"
+                        className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:hidden bg-white/90 backdrop-blur-xl border-t border-gray-100"
                     >
                         <button
                             onClick={() => setCartOpen(true)}
-                            className="w-full h-14 bg-brand-500 active:bg-brand-600 text-white rounded-xl flex items-center justify-between px-4 shadow-lg"
+                            className="w-full h-14 bg-brand-500 active:bg-brand-600 text-white rounded-xl flex items-center justify-between px-4 shadow-xl"
                         >
                             <div className="flex flex-col items-start leading-tight">
-                                <span className="font-bold text-sm">{getTotalItems()} {getTotalItems() === 1 ? 'item' : 'items'}</span>
+                                <span className="font-bold text-sm tracking-wide">{getTotalItems()} {getTotalItems() === 1 ? 'ITEM' : 'ITEMS'}</span>
                                 <span className="font-extrabold text-lg flex items-center"><span className="text-sm font-normal mr-0.5">₹</span>{getTotalPrice()}</span>
                             </div>
                             <div className="flex items-center gap-2 font-bold text-sm tracking-wide">
