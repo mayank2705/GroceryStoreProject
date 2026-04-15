@@ -24,13 +24,15 @@ def get_recent_products(db: Session = Depends(get_db)):
 @router.get("/products", response_model=List[ProductResponse])
 def get_products(
     category_id: Optional[int] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     """Get products, optionally filtered by category_id."""
     query = db.query(Product)
     if category_id:
         query = query.filter(Product.category_id == category_id)
-    return query.all()
+    return query.offset(offset).limit(limit).all()
 
 # --- ADMIN ENDPOINTS ---
 

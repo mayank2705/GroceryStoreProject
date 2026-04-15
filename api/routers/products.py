@@ -20,11 +20,16 @@ def get_recent_products(db: Session = Depends(get_db)):
     return db.query(Product).filter(Product.created_at >= yesterday).order_by(desc(Product.created_at)).all()
 
 @router.get("/products", response_model=List[ProductResponse])
-def get_products(category_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
+def get_products(
+    category_id: Optional[int] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
     query = db.query(Product)
     if category_id:
         query = query.filter(Product.category_id == category_id)
-    return query.all()
+    return query.offset(offset).limit(limit).all()
 
 @router.post("/admin/products/add", response_model=ProductResponse)
 def add_product(product: ProductCreate, authorization: str = Header(...), db: Session = Depends(get_db)):

@@ -38,10 +38,11 @@ const api = {
         return res.json();
     },
 
-    getProducts: async (categoryId) => {
-        const url = categoryId
-            ? `${API_BASE}/products?category_id=${categoryId}`
-            : `${API_BASE}/products`;
+    getProducts: async (categoryId, limit = 20, offset = 0) => {
+        let url = `${API_BASE}/products?limit=${limit}&offset=${offset}`;
+        if (categoryId) {
+            url += `&category_id=${categoryId}`;
+        }
         const res = await fetch(url);
         return res.json();
     },
