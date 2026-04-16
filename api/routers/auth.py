@@ -16,12 +16,22 @@ def send_otp(req: SendOTPRequest):
     # In real app, trigger Firebase SMS here or let client do it
     return {"message": "OTP sent"}
 
-@router.post("/verify_otp", response_model=TokenResponse)
-def verify_otp(req: VerifyOTPRequest, db: Session = Depends(get_db)):
+from pydantic import BaseModel
+
+class SyncRequest(BaseModel):
+    phoneNumber: str
+    uid: str
+
+@router.post("/sync", response_model=TokenResponse)
+def sync_user(req: SyncRequest, db: Session = Depends(get_db)):
     # Verify via Firebase Admin SDK or trust the client passed UID
-    user = db.query(User).filter(User.mobile == req.mobile).first()
+    mobile = req.phoneNumber
+    if mobile.startswith('+91'):
+        mobile = mobile[3:]
+        
+    user = db.query(User).filter(User.mobile == mobile).first()
     if not user:
-        user = User(mobile=req.mobile)
+        user = User(mobile=mobile)
         db.add(user)
         db.commit()
         db.refresh(user)

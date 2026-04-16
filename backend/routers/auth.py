@@ -13,23 +13,27 @@ ALGORITHM = "HS256"
 DUMMY_OTP = "1234"
 
 
-class OTPLoginRequest(BaseModel):
-    mobile: str
-    firebase_uid: str
+class SyncRequest(BaseModel):
+    phoneNumber: str
+    uid: str
 
-@router.post("/verify-otp", response_model=TokenResponse)
-def verify_otp(request: OTPLoginRequest, db: Session = Depends(get_db)):
-    """Accepts verified phone number and UID from Firebase frontend."""
-    # Find or create user
-    user = db.query(User).filter(User.mobile == request.mobile).first()
+@router.post("/sync", response_model=TokenResponse)
+def sync_user(request: SyncRequest, db: Session = Depends(get_db)):
+    """Accepts verified phone number and UID from Firebase frontend and creates/retrieves user."""
+    # Format phoneNumber replacing +91 if needed or just use as is
+    mobile = request.phoneNumber
+    if mobile.startswith('+91'):
+        mobile = mobile[3:]
+        
+    user = db.query(User).filter(User.mobile == mobile).first()
     if not user:
-        user = User(mobile=request.mobile)
+        user = User(mobile=mobile)
         db.add(user)
         db.commit()
         db.refresh(user)
 
     # Generate token
-    token_data = {"user_id": user.id, "mobile": user.mobile, "firebase_uid": request.firebase_uid}
+    token_data = {"user_id": user.id, "mobile": user.mobile, "firebase_uid": request.uid}
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return TokenResponse(
@@ -37,7 +41,6 @@ def verify_otp(request: OTPLoginRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         is_profile_complete=user.is_profile_complete,
     )
-
 
 def get_current_user(token: str, db: Session):
     """Decode JWT token and return the user."""

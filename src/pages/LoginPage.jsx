@@ -180,9 +180,18 @@ export default function LoginPage() {
             const result = await confirmationResult.confirm(otpString);
             const firebaseUser = result.user;
 
-            // Exchange Firebase UID for our backend JWT
-            const data = await api.verifyFirebaseUID(mobile.trim(), firebaseUser.uid);
+            // Make a POST request to our FastAPI backend (/api/auth/sync)
+            const data = await api.syncUser(firebaseUser.phoneNumber, firebaseUser.uid);
+            
+            // Update the global React state to reflect the user is logged in
             setAuth(data.access_token, data.user_id, data.is_profile_complete);
+            
+            // "close the modal" (or in this case, navigate from the page)
+            if (data.is_profile_complete) {
+                window.location.href = '/';
+            } else {
+                window.location.href = '/profile';
+            }
         } catch (err) {
             console.error('[Firebase] Verify OTP error:', err);
             setError(getFirebaseErrorMessage(err.code));

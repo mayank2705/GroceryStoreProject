@@ -1,14 +1,13 @@
 const API_BASE = '/api';
 
 const api = {
-    // Auth
-    verifyFirebaseUID: async (mobile, firebase_uid) => {
-        const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+    syncUser: async (phoneNumber, uid) => {
+        const res = await fetch(`${API_BASE}/auth/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile, firebase_uid }),
+            body: JSON.stringify({ phoneNumber, uid }),
         });
-        if (!res.ok) throw new Error('Failed to verify OTP with backend');
+        if (!res.ok) throw new Error('Failed to sync user with backend');
         return res.json();
     },
 
