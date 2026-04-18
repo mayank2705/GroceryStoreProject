@@ -7,17 +7,17 @@ import { useAuthStore } from '../store';
 export default function ProfilePage() {
     const navigate = useNavigate();
     const { token, setProfileComplete, setUser } = useAuthStore();
-    const [form, setForm] = useState({ full_name: '', mobile: '', address: '' });
+    const [form, setForm] = useState({ full_name: '', whatsapp_number: '', address: '' });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.full_name.trim() || !form.mobile.trim() || !form.address.trim()) {
+        if (!form.full_name.trim() || !form.whatsapp_number.trim() || !form.address.trim()) {
             setError('All fields are required');
             return;
         }
-        if (form.mobile.length !== 10) {
+        if (form.whatsapp_number.length !== 10) {
             setError('Enter valid 10-digit mobile number');
             return;
         }
@@ -80,9 +80,8 @@ export default function ProfilePage() {
                                 <input
                                     type="tel"
                                     maxLength={10}
-                                    value={form.mobile}
-                                    onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '') })}
-                                    placeholder="8700842030"
+                                    value={form.whatsapp_number}
+                                    onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value.replace(/\D/g, '') })}
                                     className="flex-1 h-12 px-4 rounded-xl border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all"
                                     id="profile-mobile"
                                 />

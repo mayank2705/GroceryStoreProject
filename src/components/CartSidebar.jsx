@@ -175,8 +175,6 @@ export default function CartSidebar({ open, onClose }) {
                                 {user && hasWhatsapp && whatsAppUrl ? (
                                     <a
                                         href={whatsAppUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
                                         id="whatsapp-checkout-btn"
                                         style={{
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',

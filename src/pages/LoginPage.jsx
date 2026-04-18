@@ -248,7 +248,6 @@ export default function LoginPage() {
                                             maxLength={10}
                                             value={form.whatsapp}
                                             onChange={(e) => { setForm(f => ({ ...f, whatsapp: e.target.value.replace(/\D/g, '') })); setError(''); }}
-                                            placeholder="Mobile number"
                                             autoComplete="tel"
                                             style={{ ...inputStyle, flex: 1 }}
                                             onFocus={(e) => e.target.style.borderColor = '#25D366'}
