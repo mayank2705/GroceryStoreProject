@@ -54,12 +54,14 @@ class CategoryResponse(BaseModel):
 class ProductCreate(BaseModel):
     name: str
     price: float
+    weight: Optional[str] = "1 pc"
     category_id: int
     image_url: Optional[str] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     price: Optional[float] = None
+    weight: Optional[str] = None
     category_id: Optional[int] = None
     image_url: Optional[str] = None
 

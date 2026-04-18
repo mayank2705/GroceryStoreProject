@@ -13,6 +13,7 @@ export default function AdminDashboard() {
     // Add/Edit Item Form State
     const [name, setName] = useState('');
     const [price, setPrice] = useState('');
+    const [weight, setWeight] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [imageUrl, setImageUrl] = useState('');
 
@@ -49,6 +50,7 @@ export default function AdminDashboard() {
                 const updatedProd = await api.editProduct(token, editingId, {
                     name,
                     price: parseFloat(price),
+                    weight: weight || "1 pc",
                     category_id: parseInt(categoryId),
                     image_url: imageUrl || "https://source.unsplash.com/400x400/?grocery"
                 });
@@ -59,6 +61,7 @@ export default function AdminDashboard() {
                 const newProd = await api.addProduct(token, {
                     name,
                     price: parseFloat(price),
+                    weight: weight || "1 pc",
                     category_id: parseInt(categoryId),
                     image_url: imageUrl || "https://source.unsplash.com/400x400/?grocery"
                 });
@@ -75,6 +78,7 @@ export default function AdminDashboard() {
         setEditingId(product.id);
         setName(product.name);
         setPrice(product.price);
+        setWeight(product.weight || '');
         setCategoryId(product.category_id);
         setImageUrl(product.image_url || '');
     };
@@ -83,8 +87,19 @@ export default function AdminDashboard() {
         setEditingId(null);
         setName('');
         setPrice('');
+        setWeight('');
         setCategoryId('');
         setImageUrl('');
+    };
+
+    const handleDeleteClick = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this product?")) return;
+        try {
+            await api.deleteProduct(token, id);
+            setProducts(products.filter(p => p.id !== id));
+        } catch (err) {
+            alert('Error deleting product: ' + err.message);
+        }
     };
 
     const handleToggleStock = async (id) => {
@@ -140,6 +155,14 @@ export default function AdminDashboard() {
                             placeholder="Price (Rs)"
                             value={price}
                             onChange={(e) => setPrice(e.target.value)}
+                            className="bg-gray-50 p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-500"
+                        />
+                        <input
+                            required
+                            type="text"
+                            placeholder="Weight (e.g., 500g, 1kg, 1 pc)"
+                            value={weight}
+                            onChange={(e) => setWeight(e.target.value)}
                             className="bg-gray-50 p-3 rounded-xl border border-gray-200 outline-none focus:border-brand-500"
                         />
                         <input
@@ -206,6 +229,12 @@ export default function AdminDashboard() {
                                                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${p.in_stock ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-green-50 text-green-600 hover:bg-green-100"}`}
                                             >
                                                 {p.in_stock ? "Mark Empty" : "Mark Full"}
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(p.id)}
+                                                className="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors bg-red-50 text-red-600 hover:bg-red-100 ml-1"
+                                            >
+                                                Delete
                                             </button>
                                         </div>
                                     </td>

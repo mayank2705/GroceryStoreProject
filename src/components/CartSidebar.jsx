@@ -12,10 +12,10 @@ export default function CartSidebar({ open, onClose }) {
         if (!user || !hasWhatsapp || items.length === 0) return null;
 
         const itemsList = items
-            .map((item) => `- ${item.qty}x ${item.name} (Rs.${(item.price * item.qty).toFixed(0)})`)
+            .map((item) => `- ${item.qty}x ${item.name} ${item.weight} (Rs.${(item.price * item.qty).toFixed(0)})`)
             .join('\n');
         const total = getTotal();
-        const message = `Hello Mohit Store! I would like to place an order.\n\nItems:\n${itemsList}\n\nTotal: Rs ${total.toFixed(0)}\n\nMy registered number is: ${user.whatsapp_number || 'N/A'}.`;
+        const message = `Hello Mohit Store! I would like to place an order.\n\nItems:\n${itemsList}\n\nTotal: Rs ${total.toFixed(0)}\n\nCustomer Details:\nName: ${user.full_name || 'N/A'}\nMobile: ${user.whatsapp_number || 'N/A'}\nAddress: ${user.address || 'N/A'}`;
         return `https://wa.me/919015074117?text=${encodeURIComponent(message)}`;
     };
 

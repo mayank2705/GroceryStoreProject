@@ -64,7 +64,7 @@ const api = {
     },
 
     addProduct: async (token, productData) => {
-        const res = await fetch(`${API_BASE}/admin/products/add`, {
+        const res = await fetch(`${API_BASE}/admin/products`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ const api = {
     },
 
     editProduct: async (token, productId, updates) => {
-        const res = await fetch(`${API_BASE}/admin/products/${productId}/edit`, {
+        const res = await fetch(`${API_BASE}/admin/products/${productId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -86,6 +86,15 @@ const api = {
             body: JSON.stringify(updates)
         });
         if (!res.ok) throw new Error('Failed to edit product');
+        return res.json();
+    },
+
+    deleteProduct: async (token, productId) => {
+        const res = await fetch(`${API_BASE}/admin/products/${productId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to delete product');
         return res.json();
     }
 };

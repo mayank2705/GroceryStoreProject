@@ -11,7 +11,7 @@ import NewArrivals from './pages/NewArrivals';
 import SplashScreen from './components/SplashScreen';
 
 function App() {
-    const { token, isProfileComplete, setAuth, logout, setUser } = useAuthStore();
+    const { token, user, isProfileComplete, setAuth, logout, setUser } = useAuthStore();
     const [showSplash, setShowSplash] = useState(true);
 
     useEffect(() => {
@@ -60,7 +60,7 @@ function App() {
                 {/* Admin Route */}
                 <Route
                     path="/admin"
-                    element={!token ? <Navigate to="/login" replace /> : <AdminDashboard />}
+                    element={!token || user?.email !== 'mayankbansal231@gmail.com' ? <Navigate to="/" replace /> : <AdminDashboard />}
                 />
 
                 {/* New Arrivals */}

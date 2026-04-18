@@ -83,9 +83,9 @@ def seed_database():
             db.bulk_insert_mappings(Product, batch)
             db.commit()
             total_inserted += len(batch)
-            print(f"✅ Uploaded batch: {total_inserted}/{total_items} items processed.")
+            print(f"Uploaded batch: {total_inserted}/{total_items} items processed.")
         
-        print(f"🎉 Successfully seeded {total_inserted} products across {len(categories_dict)} categories from BigBasket data.")
+        print(f"Successfully seeded {total_inserted} products across {len(categories_dict)} categories from BigBasket data.")
         
     except Exception as e:
         print(f"Error seeding database: {e}")
