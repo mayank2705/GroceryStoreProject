@@ -19,25 +19,27 @@ function App() {
             if (firebaseUser) {
                 try {
                     const data = await api.syncUser({
-                        uid: firebaseUser.uid,
+                        uid:   firebaseUser.uid,
                         email: firebaseUser.email || '',
-                        name: firebaseUser.displayName || '',
+                        name:  firebaseUser.displayName || '',
                     });
-                    
+
                     if (data.has_whatsapp_number) {
-                        setAuth(data.access_token, data.user_id, data.is_profile_complete, data.has_whatsapp_number);
-                        
-                        // Fetch the full user details to populate global state
-                        const profile = await api.getProfile(data.access_token);
-                        setUser(profile);
+                        // ── FIX #3: Fully authenticated — set state and redirect ──
+                        setAuth(data.access_token, data.user_id, data.is_profile_complete, true);
+                        try {
+                            const profile = await api.getProfile(data.access_token);
+                            setUser(profile);
+                        } catch (_) {}
                     } else {
-                        // User hasn't finished WhatsApp step, don't auto-login
-                        await auth.signOut();
-                        logout();
+                        // User is Firebase-authenticated but hasn't registered yet.
+                        // DO NOT sign out Firebase — let them land on /login and
+                        // complete the registration form (the page picks up auth.currentUser).
+                        logout();  // clear local app state only
                     }
                 } catch (err) {
                     console.error('[App] Auto-login sync failed', err);
-                    // Do not force logout on network failure; allow local session to survive
+                    // Network failure: keep local session alive, don't force logout
                 }
             } else {
                 logout();

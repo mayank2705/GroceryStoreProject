@@ -13,14 +13,15 @@ const api = {
 
     // User
     getProfile: async (token) => {
-        const res = await fetch(`${API_BASE}/users/profile`, {
+        const res = await fetch(`${API_BASE}/profile/`, {
             headers: { Authorization: `Bearer ${token}` },
         });
+        if (!res.ok) throw new Error('Failed to fetch profile');
         return res.json();
     },
 
     updateProfile: async (token, data) => {
-        const res = await fetch(`${API_BASE}/users/profile`, {
+        const res = await fetch(`${API_BASE}/profile/`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -28,6 +29,7 @@ const api = {
             },
             body: JSON.stringify(data),
         });
+        if (!res.ok) throw new Error('Failed to update profile');
         return res.json();
     },
 
