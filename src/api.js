@@ -1,11 +1,11 @@
 const API_BASE = '/api';
 
 const api = {
-    syncUser: async (phoneNumber, uid) => {
+    syncUser: async (userData) => {
         const res = await fetch(`${API_BASE}/auth/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phoneNumber, uid }),
+            body: JSON.stringify(userData),
         });
         if (!res.ok) throw new Error('Failed to sync user with backend');
         return res.json();

@@ -1,52 +1,39 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useCartStore, useAuthStore } from '../store';
 
 export default function CartSidebar({ open, onClose }) {
     const { items, addItem, removeItem, clearCart, getTotal, getTotalItems } = useCartStore();
-    const { user } = useAuthStore();
+    const { user, hasWhatsapp } = useAuthStore();
+    const navigate = useNavigate();
 
     const handleWhatsAppCheckout = () => {
-        if (!user || !user.full_name || !user.address) {
-            alert('Please complete your profile before checkout.');
+        if (!user) {
+            onClose();
+            navigate('/login');
+            return;
+        }
+
+        if (!hasWhatsapp) {
+            onClose();
+            navigate('/login');
             return;
         }
 
         const itemsList = items
             .map(
-                (item, i) =>
-                    `${i + 1}. ${item.name} (${item.weight}) x ${item.qty} = Rs.${(item.price * item.qty).toFixed(0)}`
+                (item) =>
+                    `- ${item.qty}x ${item.name} (Rs.${(item.price * item.qty).toFixed(0)})`
             )
             .join('\n');
 
         const total = getTotal();
 
-        const message = `*NEW ORDER - Mohit Store*
-----------------------------
-*Customer Details:*
-Name: ${user.full_name}
-Mobile: ${user.mobile}
-Address: ${user.address}
-
-*Order Items:*
-${itemsList}
-
-----------------------------
-*Total: Rs.${total.toFixed(0)}*
-----------------------------
-Please confirm this order. Thank you!`;
+        const message = `Hello Mohit Store! I would like to place an order. \n\nItems: \n${itemsList} \n\nTotal: Rs ${total.toFixed(0)} \n\nMy registered number is: ${user.whatsapp_number}.`;
 
         const encoded = encodeURIComponent(message);
 
-        // Check if the user is on a mobile device
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        let whatsappUrl = '';
-        if (isMobile) {
-            whatsappUrl = `https://wa.me/918700842030?text=${encoded}`;
-        } else {
-            whatsappUrl = `https://web.whatsapp.com/send?phone=918700842030&text=${encoded}`;
-        }
-
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=919015074117&text=${encoded}`;
         window.open(whatsappUrl, '_blank');
     };
 

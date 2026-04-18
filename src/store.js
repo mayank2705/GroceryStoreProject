@@ -4,16 +4,26 @@ export const useAuthStore = create((set) => ({
     token: localStorage.getItem('mohit_token') || null,
     userId: localStorage.getItem('mohit_user_id') || null,
     isProfileComplete: localStorage.getItem('mohit_profile_complete') === 'true',
+    hasWhatsapp: localStorage.getItem('mohit_has_whatsapp') === 'true',
     user: null,
 
-    setAuth: (token, userId, isProfileComplete) => {
+    setAuth: (token, userId, isProfileComplete, hasWhatsapp) => {
         localStorage.setItem('mohit_token', token);
         localStorage.setItem('mohit_user_id', userId);
         localStorage.setItem('mohit_profile_complete', isProfileComplete);
-        set({ token, userId, isProfileComplete });
+        localStorage.setItem('mohit_has_whatsapp', hasWhatsapp);
+        set({ token, userId, isProfileComplete, hasWhatsapp });
     },
 
-    setUser: (user) => set({ user }),
+    setUser: (user) => {
+        if (user) {
+            const hasWhatsapp = !!user.whatsapp_number;
+            localStorage.setItem('mohit_has_whatsapp', hasWhatsapp);
+            set({ user, hasWhatsapp });
+        } else {
+            set({ user });
+        }
+    },
 
     setProfileComplete: (val) => {
         localStorage.setItem('mohit_profile_complete', val);
@@ -24,7 +34,8 @@ export const useAuthStore = create((set) => ({
         localStorage.removeItem('mohit_token');
         localStorage.removeItem('mohit_user_id');
         localStorage.removeItem('mohit_profile_complete');
-        set({ token: null, userId: null, isProfileComplete: false, user: null });
+        localStorage.removeItem('mohit_has_whatsapp');
+        set({ token: null, userId: null, isProfileComplete: false, hasWhatsapp: false, user: null });
     },
 }));
 

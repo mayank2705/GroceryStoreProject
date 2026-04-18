@@ -1,52 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase';
 import api from '../api';
 import { useAuthStore } from '../store';
-
-// ─── Translate Firebase error codes to human-readable messages ───────────────
-function getFirebaseErrorMessage(code) {
-    const messages = {
-        'auth/invalid-phone-number':      'The phone number you entered is invalid. Please check and try again.',
-        'auth/too-many-requests':         'Too many attempts. Please wait a few minutes before trying again.',
-        'auth/invalid-verification-code': 'The OTP you entered is incorrect. Please check and re-enter.',
-        'auth/code-expired':             'This OTP has expired. Please go back and request a new one.',
-        'auth/captcha-check-failed':      'Security check failed. Please refresh the page and try again.',
-        'auth/network-request-failed':    'Network error. Please check your internet connection.',
-        'auth/quota-exceeded':            'SMS quota exceeded. Please try again later.',
-        'auth/user-disabled':             'This account has been disabled. Please contact support.',
-        'auth/missing-phone-number':      'Please enter your mobile number to continue.',
-        'auth/app-not-authorized':        'This app is not authorized to use Firebase Authentication.',
-    };
-    return messages[code] || 'Something went wrong. Please try again.';
-}
-
-// ─── Safely clear and reset the global reCAPTCHA ─────────────────────────────
-function clearRecaptcha() {
-    try {
-        if (window.recaptchaVerifier) {
-            window.recaptchaVerifier.clear();
-            window.recaptchaVerifier = null;
-        }
-    } catch (e) {
-        // Ignore — verifier may already be gone
-        window.recaptchaVerifier = null;
-    }
-}
-
-// ─── Setup invisible reCAPTCHA anchored to the send-otp button ───────────────
-function setupRecaptcha() {
-    clearRecaptcha();
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'send-otp-btn', {
-        size: 'invisible',
-        callback: () => {},
-        'expired-callback': () => {
-            clearRecaptcha();
-        },
-    });
-    return window.recaptchaVerifier;
-}
 
 // ─── Spinner SVG ─────────────────────────────────────────────────────────────
 function Spinner() {
@@ -60,34 +17,56 @@ function Spinner() {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function LoginPage() {
-    const [mobile, setMobile]                 = useState('');
-    const [otp, setOtp]                       = useState(['', '', '', '', '', '']);
-    const [step, setStep]                     = useState('mobile'); // 'mobile' | 'otp'
+    const [step, setStep]                     = useState('google'); // 'google' | 'whatsapp'
+    const [whatsappNumber, setWhatsappNumber] = useState('');
     const [loading, setLoading]               = useState(false);
     const [error, setError]                   = useState('');
-    const [confirmationResult, setConfirmationResult] = useState(null);
-    const [resendTimer, setResendTimer]       = useState(0);
+    const [fbUser, setFbUser]                 = useState(null);
 
-    const setAuth   = useAuthStore((s) => s.setAuth);
-    const otpRefs   = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
-    const timerRef  = useRef(null);
+    const setAuth = useAuthStore((s) => s.setAuth);
+    const setUser = useAuthStore((s) => s.setUser);
 
-    // Countdown for resend cooldown
-    useEffect(() => {
-        if (resendTimer > 0) {
-            timerRef.current = setTimeout(() => setResendTimer((t) => t - 1), 1000);
+    // ── Google Sign In ────────────────────────────────────────────────────────
+    const handleGoogleLogin = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            const firebaseUser = result.user;
+            setFbUser(firebaseUser);
+
+            // Make a POST request to our FastAPI backend (/api/auth/sync)
+            const data = await api.syncUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                name: firebaseUser.displayName || ''
+            });
+            
+            if (data.has_whatsapp_number) {
+                // Return user, fully logged in
+                setAuth(data.access_token, data.user_id, data.is_profile_complete, data.has_whatsapp_number);
+                api.getProfile(data.access_token).then(profile => setUser(profile)).catch(console.error);
+                window.location.href = data.is_profile_complete ? '/' : '/profile';
+            } else {
+                // New user or missing whatsapp number
+                setStep('whatsapp');
+            }
+        } catch (err) {
+            console.error('[Firebase] Google Login Error:', err);
+            if (err.code === 'auth/popup-closed-by-user') {
+                setError('Sign-in cancelled. Please try again.');
+            } else {
+                setError(err.message || 'Something went wrong. Please try again.');
+            }
+        } finally {
+            setLoading(false);
         }
-        return () => clearTimeout(timerRef.current);
-    }, [resendTimer]);
+    };
 
-    // Cleanup reCAPTCHA when component unmounts
-    useEffect(() => {
-        return () => clearRecaptcha();
-    }, []);
-
-    // ── Send OTP ──────────────────────────────────────────────────────────────
-    const handleSendOTP = async () => {
-        const trimmed = mobile.trim().replace(/\D/g, '');
+    // ── WhatsApp Submission ───────────────────────────────────────────────────
+    const handleWhatsappSubmit = async () => {
+        const trimmed = whatsappNumber.trim().replace(/\D/g, '');
         if (trimmed.length !== 10) {
             setError('Please enter a valid 10-digit mobile number.');
             return;
@@ -97,139 +76,29 @@ export default function LoginPage() {
         setError('');
 
         try {
-            const formattedNumber = '+91' + trimmed; // E.164 format
-            const verifier = setupRecaptcha();
-            const confirmation = await signInWithPhoneNumber(auth, formattedNumber, verifier);
-            setConfirmationResult(confirmation);
-            setStep('otp');
-            setResendTimer(30); // 30-second resend cooldown
-            // Focus first OTP box after transition
-            setTimeout(() => otpRefs[0]?.current?.focus(), 350);
+            const currentUser = fbUser || auth.currentUser;
+            if (!currentUser) throw new Error("Firebase user not found. Please reload and try signing in again.");
+
+            // Final sync with backend providing the whatsapp_number
+            const data = await api.syncUser({
+                uid: currentUser.uid,
+                email: currentUser.email || '',
+                name: currentUser.displayName || '',
+                whatsapp_number: trimmed
+            });
+
+            // User is now fully registered with whatsapp number
+            setAuth(data.access_token, data.user_id, data.is_profile_complete, data.has_whatsapp_number);
+            api.getProfile(data.access_token).then(profile => setUser(profile)).catch(console.error);
+            window.location.href = data.is_profile_complete ? '/' : '/profile';
         } catch (err) {
-            console.error('[Firebase] Send OTP error:', err);
-            setError(getFirebaseErrorMessage(err.code));
-            clearRecaptcha(); // Reset so user can try again without refresh
+            console.error('WhatsApp submission error:', err);
+            setError(err.message || 'Failed to finish registration. Try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    // ── OTP Input Handlers ────────────────────────────────────────────────────
-    const handleOtpChange = (index, value) => {
-        // Only allow single digit
-        const digit = value.replace(/\D/g, '').slice(-1);
-        const newOtp = [...otp];
-        newOtp[index] = digit;
-        setOtp(newOtp);
-        setError('');
-
-        // Auto-advance to next box
-        if (digit && index < 5) {
-            otpRefs[index + 1]?.current?.focus();
-        }
-
-        // Auto-submit when all 6 digits filled
-        if (digit && index === 5) {
-            const full = [...newOtp.slice(0, 5), digit].join('');
-            if (full.length === 6) handleVerifyOTP([...newOtp.slice(0, 5), digit]);
-        }
-    };
-
-    const handleOtpKeyDown = (index, e) => {
-        if (e.key === 'Backspace') {
-            if (otp[index]) {
-                // Clear current
-                const newOtp = [...otp];
-                newOtp[index] = '';
-                setOtp(newOtp);
-            } else if (index > 0) {
-                // Move to previous
-                const newOtp = [...otp];
-                newOtp[index - 1] = '';
-                setOtp(newOtp);
-                otpRefs[index - 1]?.current?.focus();
-            }
-        }
-        // Allow pasting full OTP
-        if (e.key === 'v' && (e.ctrlKey || e.metaKey)) return;
-    };
-
-    const handleOtpPaste = (e) => {
-        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-        if (pasted.length === 6) {
-            const newOtp = pasted.split('');
-            setOtp(newOtp);
-            otpRefs[5]?.current?.focus();
-            setTimeout(() => handleVerifyOTP(newOtp), 100);
-        }
-        e.preventDefault();
-    };
-
-    // ── Verify OTP ────────────────────────────────────────────────────────────
-    const handleVerifyOTP = useCallback(async (otpArr = otp) => {
-        const otpString = Array.isArray(otpArr) ? otpArr.join('') : otpArr;
-        if (otpString.length !== 6) {
-            setError('Please enter all 6 digits of your OTP.');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        try {
-            const result = await confirmationResult.confirm(otpString);
-            const firebaseUser = result.user;
-
-            // Make a POST request to our FastAPI backend (/api/auth/sync)
-            const data = await api.syncUser(firebaseUser.phoneNumber, firebaseUser.uid);
-            
-            // Update the global React state to reflect the user is logged in
-            setAuth(data.access_token, data.user_id, data.is_profile_complete);
-            
-            // "close the modal" (or in this case, navigate from the page)
-            if (data.is_profile_complete) {
-                window.location.href = '/';
-            } else {
-                window.location.href = '/profile';
-            }
-        } catch (err) {
-            console.error('[Firebase] Verify OTP error:', err);
-            setError(getFirebaseErrorMessage(err.code));
-            // Reset OTP boxes on failure
-            setOtp(['', '', '', '', '', '']);
-            otpRefs[0]?.current?.focus();
-        } finally {
-            setLoading(false);
-        }
-    }, [confirmationResult, mobile, otp, setAuth]);
-
-    // ── Timer helpers ─────────────────────────────────────────────────────────
-    const clearTimer = () => {
-        clearTimeout(timerRef.current);
-        setResendTimer(0);
-    };
-
-    // ── Go back to phone input ────────────────────────────────────────────────
-    const handleGoBack = () => {
-        setStep('mobile');
-        setOtp(['', '', '', '', '', '']);
-        setError('');
-        setConfirmationResult(null);
-        clearTimer();
-        clearRecaptcha();
-    };
-
-    // ── Resend OTP ────────────────────────────────────────────────────────────
-    const handleResend = async () => {
-        if (resendTimer > 0) return;
-        setOtp(['', '', '', '', '', '']);
-        setError('');
-        setStep('mobile');
-        // Small delay to reset state cleanly
-        setTimeout(handleSendOTP, 100);
-    };
-
-    // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
              style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}>
@@ -294,26 +163,110 @@ export default function LoginPage() {
                     <AnimatePresence mode="wait">
 
                         {/* ══════════════════════════════════════════════════
-                            STEP 1 — Phone Number Input
+                            STEP 1 — Google Login
                         ══════════════════════════════════════════════════ */}
-                        {step === 'mobile' && (
+                        {step === 'google' && (
                             <motion.div
-                                key="mobile-step"
+                                key="google-step"
                                 initial={{ opacity: 0, x: -24 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 24 }}
                                 transition={{ duration: 0.28 }}
                             >
                                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginBottom: '20px', textAlign: 'center' }}>
-                                    Enter your mobile number to receive an OTP
+                                    Sign in or create an account to continue
                                 </p>
 
-                                <label style={{ display: 'block', color: 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '600', marginBottom: '8px', letterSpacing: '0.02em' }}>
-                                    Mobile Number
-                                </label>
+                                {/* Error message */}
+                                <AnimatePresence>
+                                    {error && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -8, height: 0 }}
+                                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                            exit={{ opacity: 0, y: -8, height: 0 }}
+                                            style={{
+                                                background: 'rgba(239,68,68,0.15)',
+                                                border: '1px solid rgba(239,68,68,0.3)',
+                                                borderRadius: '10px',
+                                                padding: '10px 14px',
+                                                marginBottom: '14px',
+                                                color: '#fca5a5',
+                                                fontSize: '13px',
+                                                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                            }}
+                                        >
+                                            {error}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {/* Google Sign In button */}
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    onClick={handleGoogleLogin}
+                                    disabled={loading}
+                                    style={{
+                                        width: '100%', height: '52px',
+                                        background: loading
+                                            ? 'rgba(255,255,255,0.7)'
+                                            : '#ffffff',
+                                        border: 'none', borderRadius: '14px',
+                                        color: '#333', fontWeight: '700', fontSize: '16px',
+                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                                        boxShadow: !loading ? '0 8px 24px rgba(0,0,0,0.2)' : 'none',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    {loading ? <><Spinner /> Connecting...</> : (
+                                        <>
+                                            <svg width="24" height="24" viewBox="0 0 48 48">
+                                                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                                                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                                                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                                                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                                                <path fill="none" d="M0 0h48v48H0z"/>
+                                            </svg>
+                                            Continue with Google
+                                        </>
+                                    )}
+                                </motion.button>
+                            </motion.div>
+                        )}
+
+                        {/* ══════════════════════════════════════════════════
+                            STEP 2 — WhatsApp Number
+                        ══════════════════════════════════════════════════ */}
+                        {step === 'whatsapp' && (
+                            <motion.div
+                                key="whatsapp-step"
+                                initial={{ opacity: 0, x: 24 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -24 }}
+                                transition={{ duration: 0.28 }}
+                            >
+                                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                                    <div style={{
+                                        width: '52px', height: '52px',
+                                        background: 'rgba(37, 211, 102, 0.2)',
+                                        borderRadius: '50%',
+                                        margin: '0 auto 12px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        <svg width="24" height="24" fill="none" stroke="#25D366" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        </svg>
+                                    </div>
+                                    <p style={{ color: '#fff', fontSize: '16px', fontWeight: '600', margin: '0 0 4px' }}>
+                                        Complete Registration
+                                    </p>
+                                    <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: 0 }}>
+                                        Please provide your WhatsApp number for order updates.
+                                    </p>
+                                </div>
 
                                 <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-                                    {/* Country code badge */}
                                     <div style={{
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         minWidth: '60px', height: '52px',
@@ -326,21 +279,19 @@ export default function LoginPage() {
                                         🇮🇳 +91
                                     </div>
 
-                                    {/* Phone input */}
                                     <input
-                                        id="mobile-input"
                                         type="tel"
                                         inputMode="numeric"
                                         maxLength={10}
-                                        value={mobile}
+                                        value={whatsappNumber}
                                         onChange={(e) => {
-                                            setMobile(e.target.value.replace(/\D/g, ''));
+                                            setWhatsappNumber(e.target.value.replace(/\D/g, ''));
                                             setError('');
                                         }}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !loading) handleSendOTP();
+                                            if (e.key === 'Enter' && !loading) handleWhatsappSubmit();
                                         }}
-                                        placeholder="98765 43210"
+                                        placeholder="WhatsApp Number"
                                         autoComplete="tel"
                                         style={{
                                             flex: 1, height: '52px',
@@ -349,12 +300,12 @@ export default function LoginPage() {
                                             border: '1.5px solid rgba(255,255,255,0.12)',
                                             borderRadius: '14px',
                                             color: '#fff',
-                                            fontSize: '18px', fontWeight: '600',
+                                            fontSize: '16px', fontWeight: '600',
                                             outline: 'none',
-                                            letterSpacing: '2px',
+                                            letterSpacing: '1px',
                                             transition: 'border-color 0.2s',
                                         }}
-                                        onFocus={(e) => e.target.style.borderColor = 'rgba(99,102,241,0.7)'}
+                                        onFocus={(e) => e.target.style.borderColor = '#25D366'}
                                         onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
                                     />
                                 </div>
@@ -377,156 +328,6 @@ export default function LoginPage() {
                                                 display: 'flex', alignItems: 'flex-start', gap: '8px',
                                             }}
                                         >
-                                            <svg width="16" height="16" fill="currentColor" style={{ marginTop: '1px', flexShrink: 0 }} viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                            </svg>
-                                            {error}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
-                                {/* Send OTP button — reCAPTCHA anchors here */}
-                                <motion.button
-                                    id="send-otp-btn"
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.97 }}
-                                    onClick={handleSendOTP}
-                                    disabled={loading || mobile.length !== 10}
-                                    style={{
-                                        width: '100%', height: '52px',
-                                        background: loading || mobile.length !== 10
-                                            ? 'rgba(99,102,241,0.4)'
-                                            : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                        border: 'none', borderRadius: '14px',
-                                        color: '#fff', fontWeight: '700', fontSize: '16px',
-                                        cursor: loading || mobile.length !== 10 ? 'not-allowed' : 'pointer',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                        boxShadow: mobile.length === 10 && !loading ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
-                                        transition: 'all 0.2s',
-                                    }}
-                                >
-                                    {loading ? <><Spinner /> Sending OTP...</> : 'Send OTP →'}
-                                </motion.button>
-
-                                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textAlign: 'center', marginTop: '16px' }}>
-                                    Protected by Firebase & Google reCAPTCHA
-                                </p>
-                            </motion.div>
-                        )}
-
-                        {/* ══════════════════════════════════════════════════
-                            STEP 2 — OTP Verification
-                        ══════════════════════════════════════════════════ */}
-                        {step === 'otp' && (
-                            <motion.div
-                                key="otp-step"
-                                initial={{ opacity: 0, x: 24 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -24 }}
-                                transition={{ duration: 0.28 }}
-                            >
-                                {/* Back button */}
-                                <button
-                                    onClick={handleGoBack}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '6px',
-                                        background: 'none', border: 'none',
-                                        color: 'rgba(255,255,255,0.5)', fontSize: '13px',
-                                        cursor: 'pointer', marginBottom: '20px',
-                                        padding: 0, transition: 'color 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
-                                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
-                                >
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                    Change number
-                                </button>
-
-                                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                                    {/* Phone icon */}
-                                    <div style={{
-                                        width: '52px', height: '52px',
-                                        background: 'rgba(99,102,241,0.2)',
-                                        borderRadius: '50%',
-                                        margin: '0 auto 12px',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    }}>
-                                        <svg width="24" height="24" fill="none" stroke="rgba(165,180,252,1)" strokeWidth="2" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                                        </svg>
-                                    </div>
-                                    <p style={{ color: '#fff', fontSize: '15px', fontWeight: '600', margin: '0 0 4px' }}>
-                                        OTP sent to +91 {mobile}
-                                    </p>
-                                    <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', margin: 0 }}>
-                                        Check your SMS and enter the 6-digit code below
-                                    </p>
-                                </div>
-
-                                {/* 6 OTP boxes */}
-                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
-                                    {otp.map((digit, i) => (
-                                        <motion.input
-                                            key={i}
-                                            ref={otpRefs[i]}
-                                            id={`otp-input-${i}`}
-                                            type="tel"
-                                            inputMode="numeric"
-                                            maxLength={1}
-                                            value={digit}
-                                            onChange={(e) => handleOtpChange(i, e.target.value)}
-                                            onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                            onPaste={i === 0 ? handleOtpPaste : undefined}
-                                            initial={{ opacity: 0, y: 16 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: i * 0.06 }}
-                                            style={{
-                                                width: '48px', height: '56px',
-                                                textAlign: 'center',
-                                                fontSize: '22px', fontWeight: '800',
-                                                background: digit ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.07)',
-                                                border: `2px solid ${digit ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.12)'}`,
-                                                borderRadius: '14px',
-                                                color: '#fff',
-                                                outline: 'none',
-                                                transition: 'all 0.15s',
-                                                caretColor: 'transparent',
-                                            }}
-                                            onFocus={(e) => {
-                                                e.target.style.borderColor = 'rgba(139,92,246,0.9)';
-                                                e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.2)';
-                                            }}
-                                            onBlur={(e) => {
-                                                e.target.style.borderColor = digit ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.12)';
-                                                e.target.style.boxShadow = 'none';
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-
-                                {/* Error message */}
-                                <AnimatePresence>
-                                    {error && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -8, height: 0 }}
-                                            animate={{ opacity: 1, y: 0, height: 'auto' }}
-                                            exit={{ opacity: 0, y: -8, height: 0 }}
-                                            style={{
-                                                background: 'rgba(239,68,68,0.15)',
-                                                border: '1px solid rgba(239,68,68,0.3)',
-                                                borderRadius: '10px',
-                                                padding: '10px 14px',
-                                                marginBottom: '14px',
-                                                color: '#fca5a5',
-                                                fontSize: '13px',
-                                                display: 'flex', alignItems: 'flex-start', gap: '8px',
-                                            }}
-                                        >
-                                            <svg width="16" height="16" fill="currentColor" style={{ marginTop: '1px', flexShrink: 0 }} viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                            </svg>
                                             {error}
                                         </motion.div>
                                     )}
@@ -534,47 +335,25 @@ export default function LoginPage() {
 
                                 {/* Verify button */}
                                 <motion.button
-                                    id="verify-otp-btn"
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.97 }}
-                                    onClick={() => handleVerifyOTP()}
-                                    disabled={loading || otp.join('').length !== 6}
+                                    onClick={handleWhatsappSubmit}
+                                    disabled={loading || whatsappNumber.length !== 10}
                                     style={{
                                         width: '100%', height: '52px',
-                                        background: loading || otp.join('').length !== 6
-                                            ? 'rgba(99,102,241,0.4)'
-                                            : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                        background: loading || whatsappNumber.length !== 10
+                                            ? 'rgba(37, 211, 102, 0.4)'
+                                            : '#25D366',
                                         border: 'none', borderRadius: '14px',
                                         color: '#fff', fontWeight: '700', fontSize: '16px',
-                                        cursor: loading || otp.join('').length !== 6 ? 'not-allowed' : 'pointer',
+                                        cursor: loading || whatsappNumber.length !== 10 ? 'not-allowed' : 'pointer',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                        boxShadow: otp.join('').length === 6 && !loading ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+                                        boxShadow: whatsappNumber.length === 10 && !loading ? '0 8px 24px rgba(37, 211, 102, 0.4)' : 'none',
                                         transition: 'all 0.2s',
                                     }}
                                 >
-                                    {loading ? <><Spinner /> Verifying...</> : 'Verify & Continue →'}
+                                    {loading ? <><Spinner /> Saving...</> : 'Finish Registration →'}
                                 </motion.button>
-
-                                {/* Resend */}
-                                <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                                    {resendTimer > 0 ? (
-                                        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '13px', margin: 0 }}>
-                                            Resend OTP in <span style={{ color: '#a5b4fc', fontWeight: '600' }}>{resendTimer}s</span>
-                                        </p>
-                                    ) : (
-                                        <button
-                                            onClick={handleResend}
-                                            style={{
-                                                background: 'none', border: 'none',
-                                                color: '#a5b4fc', fontSize: '13px',
-                                                fontWeight: '600', cursor: 'pointer',
-                                                textDecoration: 'underline', textUnderlineOffset: '3px',
-                                            }}
-                                        >
-                                            Resend OTP
-                                        </button>
-                                    )}
-                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>

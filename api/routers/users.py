@@ -20,9 +20,10 @@ def update_profile(updates: UserProfileUpdate, authorization: str = Header(...),
     
     user.full_name = updates.full_name
     user.address = updates.address
+    user.whatsapp_number = updates.whatsapp_number
     
     # Mark as complete if everything is provided
-    if user.full_name and user.address:
+    if user.full_name and user.address and user.whatsapp_number:
         user.is_profile_complete = True
         
     db.commit()

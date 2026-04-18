@@ -27,9 +27,11 @@ def update_profile(
     user = get_current_user(token, db)
 
     user.full_name = profile.full_name
-    user.mobile = profile.mobile
+    user.whatsapp_number = profile.whatsapp_number
     user.address = profile.address
-    user.is_profile_complete = True
+    
+    if user.full_name and user.whatsapp_number and user.address:
+        user.is_profile_complete = True
 
     db.commit()
     db.refresh(user)

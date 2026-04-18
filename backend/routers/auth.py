@@ -13,34 +13,62 @@ ALGORITHM = "HS256"
 DUMMY_OTP = "1234"
 
 
-class SyncRequest(BaseModel):
-    phoneNumber: str
-    uid: str
+from typing import Optional
 
-@router.post("/sync", response_model=TokenResponse)
-def sync_user(request: SyncRequest, db: Session = Depends(get_db)):
-    """Accepts verified phone number and UID from Firebase frontend and creates/retrieves user."""
-    # Format phoneNumber replacing +91 if needed or just use as is
-    mobile = request.phoneNumber
-    if mobile.startswith('+91'):
-        mobile = mobile[3:]
-        
-    user = db.query(User).filter(User.mobile == mobile).first()
+class SyncRequest(BaseModel):
+    uid: str
+    email: str
+    name: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+
+@router.post("/sync")
+def sync_user(req: SyncRequest, db: Session = Depends(get_db)):
+    # Check by firebase_uid
+    user = db.query(User).filter(User.firebase_uid == req.uid).first()
     if not user:
-        user = User(mobile=mobile)
-        db.add(user)
+        # Fallback to check by email
+        user = db.query(User).filter(User.email == req.email).first()
+        if user:
+            user.firebase_uid = req.uid
+        else:
+            # Create new user
+            user = User(
+                firebase_uid=req.uid,
+                email=req.email,
+                full_name=req.name
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+    # If whatsapp_number is provided, update the user
+    if req.whatsapp_number:
+        # Validate format or handle +91
+        number = req.whatsapp_number
+        if number.startswith('+91'):
+            number = number[3:]
+        user.whatsapp_number = number
         db.commit()
         db.refresh(user)
 
-    # Generate token
-    token_data = {"user_id": user.id, "mobile": user.mobile, "firebase_uid": request.uid}
+    has_whatsapp = bool(user.whatsapp_number)
+    
+    # Auto mark profile as complete if they have minimal required fields
+    if user.whatsapp_number and user.address and user.full_name:
+        if not user.is_profile_complete:
+            user.is_profile_complete = True
+            db.commit()
+
+    token_data = {"user_id": user.id, "firebase_uid": req.uid}
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
-    return TokenResponse(
-        access_token=token,
-        user_id=user.id,
-        is_profile_complete=user.is_profile_complete,
-    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "is_profile_complete": user.is_profile_complete,
+        "has_whatsapp_number": has_whatsapp
+    }
 
 def get_current_user(token: str, db: Session):
     """Decode JWT token and return the user."""

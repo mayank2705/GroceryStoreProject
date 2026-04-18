@@ -8,7 +8,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    mobile = Column(String(15), unique=True, index=True, nullable=False)
+    whatsapp_number = Column(String(15), unique=True, index=True, nullable=True)
+    email = Column(String(150), unique=True, index=True, nullable=True)
+    firebase_uid = Column(String(100), unique=True, index=True, nullable=True)
     full_name = Column(String(100), nullable=True)
     address = Column(Text, nullable=True)
     is_profile_complete = Column(Boolean, default=False)

@@ -4,11 +4,11 @@ from datetime import datetime
 
 # --- Auth ---
 class SendOTPRequest(BaseModel):
-    mobile: str
+    whatsapp_number: str
 
 
 class VerifyOTPRequest(BaseModel):
-    mobile: str
+    whatsapp_number: str
     firebase_uid: str
 
 
@@ -22,13 +22,15 @@ class TokenResponse(BaseModel):
 # --- User Profile ---
 class UserProfileUpdate(BaseModel):
     full_name: str
-    mobile: str
+    whatsapp_number: str
     address: str
 
 
 class UserProfileResponse(BaseModel):
     id: int
-    mobile: str
+    whatsapp_number: Optional[str] = None
+    email: Optional[str] = None
+    firebase_uid: Optional[str] = None
     full_name: Optional[str] = None
     address: Optional[str] = None
     is_profile_complete: bool
