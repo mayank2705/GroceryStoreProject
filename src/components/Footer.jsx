@@ -1,6 +1,17 @@
 import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store';
 
 export default function Footer() {
+    const { setSearchQuery } = useAuthStore();
+    const navigate = useNavigate();
+
+    const handleCategoryClick = (categoryName) => {
+        setSearchQuery(categoryName);
+        navigate('/');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     return (
         <footer className="bg-white border-t border-gray-200 mt-8 pb-20 sm:pb-8 pt-8">
             <div className="max-w-7xl mx-auto px-4">
@@ -8,20 +19,19 @@ export default function Footer() {
                     <div>
                         <h3 className="font-bold text-gray-800 text-lg mb-4">Useful Links</h3>
                         <ul className="space-y-2 text-sm text-gray-600">
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">About Us</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Privacy Policy</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Terms of Use</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Return Policy</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">FAQs</a></li>
+                            <li><Link to="/about" className="hover:text-brand-600 transition-colors">About Us</Link></li>
+                            <li><Link to="/privacy-policy" className="hover:text-brand-600 transition-colors">Privacy Policy</Link></li>
+                            <li><Link to="/terms-of-use" className="hover:text-brand-600 transition-colors">Terms of Use</Link></li>
+                            <li><Link to="/return-policy" className="hover:text-brand-600 transition-colors">Return Policy</Link></li>
                         </ul>
                     </div>
                     <div>
                         <h3 className="font-bold text-gray-800 text-lg mb-4">Categories</h3>
                         <ul className="space-y-2 text-sm text-gray-600">
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Vegetables & Fruits</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Dairy & Breakfast</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Munchies & Snacks</a></li>
-                            <li><a href="#" className="hover:text-brand-600 transition-colors">Cold Drinks & Juices</a></li>
+                            <li><button onClick={() => handleCategoryClick('Vegetable')} className="hover:text-brand-600 transition-colors text-left w-full">Vegetables & Fruits</button></li>
+                            <li><button onClick={() => handleCategoryClick('Dairy')} className="hover:text-brand-600 transition-colors text-left w-full">Dairy & Breakfast</button></li>
+                            <li><button onClick={() => handleCategoryClick('Snack')} className="hover:text-brand-600 transition-colors text-left w-full">Munchies & Snacks</button></li>
+                            <li><button onClick={() => handleCategoryClick('Cold Drink')} className="hover:text-brand-600 transition-colors text-left w-full">Cold Drinks & Juices</button></li>
                         </ul>
                     </div>
                     <div>
@@ -32,13 +42,13 @@ export default function Footer() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                <span>Mohit Store<br/>Main Market Road, Sector 15<br/>Gurugram, Haryana 122001</span>
+                                <span>Mohit Store<br/>A-1/179 Sector-4 Rohini<br/>Delhi-110085<br/>Near Khadi Grahmodhyog Bhawan</span>
                             </li>
                             <li className="flex items-center gap-2 mt-2">
                                 <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                 </svg>
-                                <span>+91 98765 43210</span>
+                                <span>+91 9015074117</span>
                             </li>
                         </ul>
                     </div>

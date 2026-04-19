@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, Text, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, Text, DateTime, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from api.database import Base
@@ -39,3 +39,13 @@ class Product(Base):
     in_stock = Column(Boolean, default=True)
     
     category = relationship("Category", back_populates="products")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    firebase_uid = Column(String(100), index=True, nullable=False)
+    items = Column(JSON, nullable=False)
+    total_price = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

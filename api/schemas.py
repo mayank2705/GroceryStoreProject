@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # --- Auth ---
@@ -57,6 +57,7 @@ class ProductCreate(BaseModel):
     weight: Optional[str] = "1 pc"
     category_id: int
     image_url: Optional[str] = None
+    in_stock: Optional[bool] = True
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -64,6 +65,7 @@ class ProductUpdate(BaseModel):
     weight: Optional[str] = None
     category_id: Optional[int] = None
     image_url: Optional[str] = None
+    in_stock: Optional[bool] = None
 
 class ProductResponse(BaseModel):
     id: int
@@ -73,6 +75,23 @@ class ProductResponse(BaseModel):
     image_url: Optional[str] = None
     category_id: int
     in_stock: bool
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Order ---
+class OrderCreate(BaseModel):
+    firebase_uid: str
+    items: List[Dict[str, Any]]
+    total_price: float
+
+class OrderResponse(BaseModel):
+    id: int
+    firebase_uid: str
+    items: List[Dict[str, Any]]
+    total_price: float
     created_at: Optional[datetime] = None
 
     class Config:

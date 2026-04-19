@@ -2,8 +2,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.database import engine, Base
-from api.models import User, Category, Product
-from api.routers import auth, products, users, admin
+from api.models import User, Category, Product, Order
+from api.routers import auth, products, users, admin, orders
 
 # Create all tables (In production, use Alembic)
 Base.metadata.create_all(bind=engine)
@@ -23,6 +23,7 @@ app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(users.router)
 app.include_router(admin.router)
+app.include_router(orders.router)
 
 @app.get("/api/health")
 def health_check():

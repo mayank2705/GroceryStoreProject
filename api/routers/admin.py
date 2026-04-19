@@ -20,15 +20,16 @@ def verify_admin(authorization: str = Header(...), db: Session = Depends(get_db)
 @router.get("/products", response_model=List[ProductResponse])
 def get_admin_products(
     category_id: Optional[int] = Query(None),
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    in_stock: Optional[bool] = Query(None),
     user: User = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
     query = db.query(Product)
     if category_id:
         query = query.filter(Product.category_id == category_id)
-    return query.order_by(desc(Product.id)).offset(offset).limit(limit).all()
+    if in_stock is not None:
+        query = query.filter(Product.in_stock == in_stock)
+    return query.order_by(desc(Product.id)).all()
 
 @router.post("/products", response_model=ProductResponse)
 def add_product(product: ProductCreate, user: User = Depends(verify_admin), db: Session = Depends(get_db)):
@@ -42,7 +43,7 @@ def add_product(product: ProductCreate, user: User = Depends(verify_admin), db: 
         weight=product.weight,
         category_id=product.category_id,
         image_url=product.image_url or "https://source.unsplash.com/400x400/?grocery",
-        in_stock=True
+        in_stock=product.in_stock if product.in_stock is not None else True
     )
     db.add(db_prod)
     db.commit()

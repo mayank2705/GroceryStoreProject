@@ -6,6 +6,9 @@ export const useAuthStore = create((set) => ({
     isProfileComplete: localStorage.getItem('mohit_profile_complete') === 'true',
     hasWhatsapp: localStorage.getItem('mohit_has_whatsapp') === 'true',
     user: null,
+    searchQuery: '',
+
+    setSearchQuery: (query) => set({ searchQuery: query }),
 
     setAuth: (token, userId, isProfileComplete, hasWhatsapp) => {
         localStorage.setItem('mohit_token', token);

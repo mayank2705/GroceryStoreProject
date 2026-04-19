@@ -53,7 +53,14 @@ const api = {
         return res.json();
     },
 
-    // Admin
+    getAdminProducts: async (token) => {
+        const res = await fetch(`${API_BASE}/admin/products`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch admin products');
+        return res.json();
+    },
+
     toggleStock: async (token, productId) => {
         const res = await fetch(`${API_BASE}/admin/products/${productId}/toggle_stock`, {
             method: 'PUT',
@@ -95,6 +102,23 @@ const api = {
             headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to delete product');
+        return res.json();
+    },
+
+    // Orders
+    createOrder: async (data) => {
+        const res = await fetch(`${API_BASE}/orders/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to create order');
+        return res.json();
+    },
+
+    getOrders: async (firebaseUid) => {
+        const res = await fetch(`${API_BASE}/orders/${firebaseUid}`);
+        if (!res.ok) throw new Error('Failed to fetch orders');
         return res.json();
     }
 };

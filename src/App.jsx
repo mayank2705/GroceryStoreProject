@@ -8,6 +8,11 @@ import ProfilePage from './pages/ProfilePage';
 import HomePage from './pages/HomePage';
 import AdminDashboard from './pages/AdminDashboard';
 import NewArrivals from './pages/NewArrivals';
+import OrdersPage from './pages/OrdersPage';
+import AboutUs from './pages/AboutUs';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfUse from './pages/TermsOfUse';
+import ReturnPolicy from './pages/ReturnPolicy';
 import SplashScreen from './components/SplashScreen';
 
 function App() {
@@ -89,6 +94,12 @@ function App() {
                     }
                 />
 
+                {/* Orders Route */}
+                <Route
+                    path="/orders"
+                    element={!token ? <Navigate to="/login" replace /> : <OrdersPage />}
+                />
+
                 {/* Public Home Route */}
                 <Route
                     path="/"
@@ -100,6 +111,12 @@ function App() {
                         )
                     }
                 />
+
+                {/* Static Policy Routes */}
+                <Route path="/about" element={<AboutUs />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms-of-use" element={<TermsOfUse />} />
+                <Route path="/return-policy" element={<ReturnPolicy />} />
 
                 {/* Catch all */}
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -7,6 +7,8 @@ import HeroCarousel from '../components/HeroCarousel';
 import CategorySlider from '../components/CategorySlider';
 import CategoryRow from '../components/CategoryRow';
 import Footer from '../components/Footer';
+import { auth } from '../firebase';
+import { signOut } from 'firebase/auth';
 
 export default function HomePage() {
     const [categories, setCategories] = useState([]);
@@ -16,9 +18,8 @@ export default function HomePage() {
     const LIMIT = 50;
 
     const [cartOpen, setCartOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const { addItem, removeItem, items: cartItems, getTotalItems, getTotal: getTotalPrice } = useCartStore();
-    const { user, token, setUser, logout } = useAuthStore();
+    const { user, token, setUser, logout, searchQuery, setSearchQuery } = useAuthStore();
 
     useEffect(() => {
         fetchInitialData();
@@ -85,12 +86,24 @@ export default function HomePage() {
     };
 
     const filteredProducts = searchQuery
-        ? products.filter((p) =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        ? products.filter((p) => {
+            const sq = searchQuery.toLowerCase();
+            const cname = categories.find(c => c.id === p.category_id)?.name || '';
+            return p.name.toLowerCase().includes(sq) || cname.toLowerCase().includes(sq);
+        })
         : products;
 
     const isGridMode = activeCategory !== null || searchQuery !== '';
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Error signing out: ", error);
+        }
+        logout();
+        window.location.href = '/';
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -102,7 +115,7 @@ export default function HomePage() {
                             <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity">
                                 <div className="flex items-center gap-1">
                                     <h2 className="text-lg font-bold text-gray-900 leading-tight flex items-center gap-1">
-                                    Delivery in 10 minutes
+                                    Mohit Store
                                     </h2>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -116,9 +129,25 @@ export default function HomePage() {
                             </div>
                             
                             <div className="flex items-center gap-3 shrink-0">
+                                {user?.email === 'mayankbansal231@gmail.com' && (
+                                    <button
+                                        onClick={() => window.location.href = '/admin'}
+                                        className="hidden sm:block h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                                    >
+                                        Products Inventory
+                                    </button>
+                                )}
+                                {user && token && (
+                                    <button
+                                        onClick={() => window.location.href = '/orders'}
+                                        className="h-9 px-4 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-semibold text-sm transition-colors"
+                                    >
+                                        My Orders
+                                    </button>
+                                )}
                                 {user && token ? (
                                     <button
-                                        onClick={logout}
+                                        onClick={handleLogout}
                                         className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-600"
                                         title="Logout"
                                     >
