@@ -18,6 +18,7 @@ export default function HomePage() {
     const LIMIT = 50;
 
     const [cartOpen, setCartOpen] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const { addItem, removeItem, items: cartItems, getTotalItems, getTotal: getTotalPrice } = useCartStore();
     const { user, token, setUser, logout, searchQuery, setSearchQuery } = useAuthStore();
 
@@ -128,11 +129,26 @@ export default function HomePage() {
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-3 shrink-0">
+                            {/* Hamburger Menu Button (Mobile Only) */}
+                            <button
+                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                                className="sm:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {mobileMenuOpen ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                                    )}
+                                </svg>
+                            </button>
+
+                            {/* Desktop Navigation */}
+                            <div className="hidden sm:flex items-center gap-3 shrink-0">
                                 {user?.email === 'mayankbansal231@gmail.com' && (
                                     <button
                                         onClick={() => window.location.href = '/admin'}
-                                        className="hidden sm:block h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                                        className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
                                     >
                                         Products Inventory
                                     </button>
@@ -165,6 +181,53 @@ export default function HomePage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Mobile Navigation Menu */}
+                        <AnimatePresence>
+                            {mobileMenuOpen && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="sm:hidden flex flex-col gap-2 overflow-hidden"
+                                >
+                                    {user?.email === 'mayankbansal231@gmail.com' && (
+                                        <button
+                                            onClick={() => window.location.href = '/admin'}
+                                            className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                                        >
+                                            Products Inventory
+                                        </button>
+                                    )}
+                                    {user && token && (
+                                        <button
+                                            onClick={() => window.location.href = '/orders'}
+                                            className="w-full text-left px-4 py-3 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-semibold text-sm transition-colors"
+                                        >
+                                            My Orders
+                                        </button>
+                                    )}
+                                    {user && token ? (
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm transition-colors flex items-center justify-between"
+                                        >
+                                            Logout
+                                            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                            </svg>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => window.location.href = '/login'}
+                                            className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                                        >
+                                            Login
+                                        </button>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         <div className="relative">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

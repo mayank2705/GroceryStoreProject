@@ -31,6 +31,12 @@ export default function AdminDashboard() {
     // Edit mode tracking
     const [editingId, setEditingId] = useState(null);
 
+    // Orders Tab State
+    const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'orders'
+    const [orders, setOrders] = useState([]);
+    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+    const [loadingOrders, setLoadingOrders] = useState(false);
+
     // In a strict app we would do: if (!user || !user.is_admin) return <Navigate to="/" />
 
     useEffect(() => {
@@ -56,6 +62,24 @@ export default function AdminDashboard() {
         }
         setLoading(false);
     };
+
+    const loadOrders = async (date) => {
+        setLoadingOrders(true);
+        try {
+            const fetchedOrders = await api.getAdminOrders(token, date);
+            setOrders(fetchedOrders);
+        } catch (err) {
+            console.error('Failed to load admin orders:', err);
+            toast.error('Failed to load orders');
+        }
+        setLoadingOrders(false);
+    };
+
+    useEffect(() => {
+        if (activeTab === 'orders') {
+            loadOrders(dateFilter);
+        }
+    }, [activeTab, dateFilter]);
 
     const handleSubmitForm = async (e) => {
         e.preventDefault();
@@ -173,9 +197,27 @@ export default function AdminDashboard() {
                 </button>
             </div>
 
+            {/* Tab Navigation */}
+            <div className="w-full max-w-7xl flex gap-4 mb-6">
+                <button
+                    onClick={() => setActiveTab('inventory')}
+                    className={`px-6 py-2 rounded-xl font-bold transition-colors ${activeTab === 'inventory' ? 'bg-brand-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+                >
+                    Inventory Management
+                </button>
+                <button
+                    onClick={() => setActiveTab('orders')}
+                    className={`px-6 py-2 rounded-xl font-bold transition-colors ${activeTab === 'orders' ? 'bg-brand-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+                >
+                    Order History
+                </button>
+            </div>
+
             <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* Left Panel: Add Item Form */}
+                {activeTab === 'inventory' && (
+                    <>
+                        {/* Left Panel: Add Item Form */}
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -333,6 +375,79 @@ export default function AdminDashboard() {
                         )}
                     </div>
                 </motion.div>
+                    </>
+                )}
+
+                {activeTab === 'orders' && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 col-span-1 lg:col-span-3 flex flex-col"
+                    >
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h2 className="text-xl font-bold text-gray-800">Order History</h2>
+                            <div className="flex items-center gap-3">
+                                <label className="text-sm font-semibold text-gray-600">Filter by Date:</label>
+                                <input
+                                    type="date"
+                                    value={dateFilter}
+                                    onChange={(e) => setDateFilter(e.target.value)}
+                                    className="bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 outline-none focus:border-brand-500 font-medium text-gray-700"
+                                />
+                                <button
+                                    onClick={() => setDateFilter('')}
+                                    className="px-3 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        {loadingOrders ? (
+                            <div className="py-10 text-center font-medium text-gray-500">Loading orders...</div>
+                        ) : orders.length === 0 ? (
+                            <div className="py-20 text-center font-medium text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
+                                No orders found for the selected date.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {orders.map(order => (
+                                    <div key={order.id} className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                                        <div className="flex justify-between items-start mb-3 border-b border-gray-200 pb-3">
+                                            <div>
+                                                <h3 className="font-bold text-gray-800 text-lg">Order #{order.id}</h3>
+                                                <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleString()}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="font-extrabold text-brand-600 text-lg">₹{order.total_price}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mb-4">
+                                            <p className="text-sm font-semibold text-gray-700 mb-1">Customer Details</p>
+                                            <p className="text-xs text-gray-600"><strong>Name:</strong> {order.customer_name || 'N/A'}</p>
+                                            <p className="text-xs text-gray-600"><strong>Phone:</strong> {order.customer_phone || 'N/A'}</p>
+                                            <p className="text-xs text-gray-600"><strong>Email:</strong> {order.customer_email || 'N/A'}</p>
+                                            <p className="text-xs text-gray-600 mt-1"><strong>Address:</strong> {order.customer_address || 'N/A'}</p>
+                                        </div>
+
+                                        <div className="mt-auto pt-3 border-t border-gray-200">
+                                            <p className="text-sm font-semibold text-gray-700 mb-2">Items Ordered</p>
+                                            <div className="space-y-1">
+                                                {order.items.map((item, idx) => (
+                                                    <div key={idx} className="flex justify-between text-xs">
+                                                        <span className="text-gray-700">{item.qty}x {item.name} ({item.weight})</span>
+                                                        <span className="font-medium text-gray-600">₹{item.price * item.qty}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </motion.div>
+                )}
 
             </div>
         </div>

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Query, Header, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from datetime import datetime, timedelta
 from typing import Optional, List
 from api.database import get_db
-from api.models import Category, Product, User
-from api.schemas import ProductResponse, ProductCreate, ProductUpdate
+from api.models import Category, Product, User, Order
+from api.schemas import ProductResponse, ProductCreate, ProductUpdate, AdminOrderResponse
 from api.routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -90,3 +90,37 @@ def delete_product(product_id: int, user: User = Depends(verify_admin), db: Sess
     db.delete(prod)
     db.commit()
     return {"message": "Product deleted successfully"}
+
+@router.get("/orders", response_model=List[AdminOrderResponse])
+def get_admin_orders(
+    date: Optional[str] = Query(None, description="Format: YYYY-MM-DD"),
+    user: User = Depends(verify_admin),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Order, User).join(User, Order.firebase_uid == User.firebase_uid, isouter=True)
+    
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+            query = query.filter(func.date(Order.created_at) == target_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+            
+    results = query.order_by(desc(Order.created_at)).all()
+    
+    orders = []
+    for order, db_user in results:
+        order_dict = {
+            "id": order.id,
+            "firebase_uid": order.firebase_uid,
+            "items": order.items,
+            "total_price": order.total_price,
+            "created_at": order.created_at,
+            "customer_name": db_user.full_name if db_user else None,
+            "customer_email": db_user.email if db_user else None,
+            "customer_phone": db_user.whatsapp_number if db_user else None,
+            "customer_address": db_user.address if db_user else None
+        }
+        orders.append(order_dict)
+        
+    return orders

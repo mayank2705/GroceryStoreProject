@@ -96,3 +96,17 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AdminOrderResponse(BaseModel):
+    id: int
+    firebase_uid: str
+    items: List[Dict[str, Any]]
+    total_price: float
+    created_at: Optional[datetime] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_address: Optional[str] = None
+
+    class Config:
+        from_attributes = True

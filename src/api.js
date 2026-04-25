@@ -120,6 +120,18 @@ const api = {
         const res = await fetch(`${API_BASE}/orders/${firebaseUid}`);
         if (!res.ok) throw new Error('Failed to fetch orders');
         return res.json();
+    },
+
+    getAdminOrders: async (token, dateFilter = null) => {
+        let url = `${API_BASE}/admin/orders`;
+        if (dateFilter) {
+            url += `?date=${dateFilter}`;
+        }
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch admin orders');
+        return res.json();
     }
 };
 
