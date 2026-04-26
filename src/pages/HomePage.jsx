@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
 import { useCartStore, useAuthStore } from '../store';
@@ -22,22 +23,29 @@ export default function HomePage() {
     const { addItem, removeItem, items: cartItems, getTotalItems, getTotal: getTotalPrice } = useCartStore();
     const { user, token, setUser, logout, searchQuery, setSearchQuery } = useAuthStore();
 
+    const location = useLocation();
+    const navigate = useNavigate();
+
     useEffect(() => {
         fetchInitialData();
         if (token) {
             loadProfile();
         }
-    }, [token]);
+    }, [token, location.search]);
 
     const fetchInitialData = async () => {
         setLoading(true);
         try {
+            const params = new URLSearchParams(location.search);
+            const catId = params.get('category') ? Number(params.get('category')) : null;
+
             const [cats, prods] = await Promise.all([
                 api.getCategories(),
-                api.getProducts(null, LIMIT, 0)
+                api.getProducts(catId, LIMIT, 0)
             ]);
             setCategories(cats);
             setProducts(prods);
+            setActiveCategory(catId);
         } catch (err) {
             console.error('Failed to load data:', err);
         }
@@ -53,28 +61,13 @@ export default function HomePage() {
         }
     };
 
-    const handleCategoryClick = async (catId) => {
-        setActiveCategory(catId);
+    const handleCategoryClick = (catId) => {
+        if (catId) {
+            navigate(`/?category=${catId}`);
+        } else {
+            navigate('/');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        if (!catId) {
-            setLoading(true);
-            try {
-                const prods = await api.getProducts(null, LIMIT, 0);
-                setProducts(prods);
-            } catch (err) { console.error(err); }
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const prods = await api.getProducts(catId, LIMIT, 0);
-            setProducts(prods);
-        } catch (err) {
-            console.error(err);
-        }
-        setLoading(false);
     };
 
     const handleSeeAll = (catId) => {
@@ -120,7 +113,7 @@ export default function HomePage() {
                                     </h2>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <p className="text-sm text-gray-500 truncate max-w-[200px] sm:max-w-sm">
+                                    <p className="text-xs sm:text-sm text-gray-500 truncate max-w-[160px] sm:max-w-sm">
                                         {user?.full_name ? `${user.full_name} - ${user.address || 'Select Address'}` : 'Home - Select Delivery Location'}
                                     </p>
                                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,42 +122,35 @@ export default function HomePage() {
                                 </div>
                             </div>
                             
-                            {/* Hamburger Menu Button (Mobile Only) */}
-                            <button
-                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className="sm:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    {mobileMenuOpen ? (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    ) : (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                                    )}
-                                </svg>
-                            </button>
-
-                            {/* Desktop Navigation */}
-                            <div className="hidden sm:flex items-center gap-3 shrink-0">
+                            {/* Actions - Icon based for Mobile & Desktop */}
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                                 {user?.email === 'mayankbansal231@gmail.com' && (
                                     <button
                                         onClick={() => window.location.href = '/admin'}
-                                        className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                                        className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
+                                        title="Admin Inventory"
                                     >
-                                        Products Inventory
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
                                     </button>
                                 )}
                                 {user && token && (
                                     <button
                                         onClick={() => window.location.href = '/orders'}
-                                        className="h-9 px-4 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-semibold text-sm transition-colors"
+                                        className="w-9 h-9 flex items-center justify-center bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-full transition-colors"
+                                        title="My Orders"
                                     >
-                                        My Orders
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        </svg>
                                     </button>
                                 )}
                                 {user && token ? (
                                     <button
                                         onClick={handleLogout}
-                                        className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-600"
+                                        className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
                                         title="Logout"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,60 +160,16 @@ export default function HomePage() {
                                 ) : (
                                     <button
                                         onClick={() => window.location.href = '/login'}
-                                        className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                                        className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
+                                        title="Login"
                                     >
-                                        Login
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
                                     </button>
                                 )}
                             </div>
                         </div>
-
-                        {/* Mobile Navigation Menu */}
-                        <AnimatePresence>
-                            {mobileMenuOpen && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="sm:hidden flex flex-col gap-2 overflow-hidden"
-                                >
-                                    {user?.email === 'mayankbansal231@gmail.com' && (
-                                        <button
-                                            onClick={() => window.location.href = '/admin'}
-                                            className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
-                                        >
-                                            Products Inventory
-                                        </button>
-                                    )}
-                                    {user && token && (
-                                        <button
-                                            onClick={() => window.location.href = '/orders'}
-                                            className="w-full text-left px-4 py-3 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg font-semibold text-sm transition-colors"
-                                        >
-                                            My Orders
-                                        </button>
-                                    )}
-                                    {user && token ? (
-                                        <button
-                                            onClick={handleLogout}
-                                            className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm transition-colors flex items-center justify-between"
-                                        >
-                                            Logout
-                                            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                            </svg>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => window.location.href = '/login'}
-                                            className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
-                                        >
-                                            Login
-                                        </button>
-                                    )}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
 
                         <div className="relative">
                             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +180,7 @@ export default function HomePage() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder='Search "atta", "milk", "vegetables"...'
-                                className="w-full h-12 pl-10 pr-4 rounded-xl bg-gray-100 border-none focus:ring-1 focus:ring-brand-500 outline-none text-sm font-medium"
+                                className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl bg-gray-100 border-none focus:ring-1 focus:ring-brand-500 outline-none text-sm font-medium"
                                 id="search-input"
                             />
                         </div>

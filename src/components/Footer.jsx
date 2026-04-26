@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store';
+import api from '../api';
 
 export default function Footer() {
-    const { setSearchQuery } = useAuthStore();
+    const [categories, setCategories] = useState([]);
     const navigate = useNavigate();
 
-    const handleCategoryClick = (categoryName) => {
-        setSearchQuery(categoryName);
-        navigate('/');
+    useEffect(() => {
+        api.getCategories().then(setCategories).catch(console.error);
+    }, []);
+
+    const handleCategoryClick = (categoryId) => {
+        navigate(`/?category=${categoryId}`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -28,10 +31,16 @@ export default function Footer() {
                     <div>
                         <h3 className="font-bold text-gray-800 text-lg mb-4">Categories</h3>
                         <ul className="space-y-2 text-sm text-gray-600">
-                            <li><button onClick={() => handleCategoryClick('Vegetable')} className="hover:text-brand-600 transition-colors text-left w-full">Vegetables & Fruits</button></li>
-                            <li><button onClick={() => handleCategoryClick('Dairy')} className="hover:text-brand-600 transition-colors text-left w-full">Dairy & Breakfast</button></li>
-                            <li><button onClick={() => handleCategoryClick('Snack')} className="hover:text-brand-600 transition-colors text-left w-full">Munchies & Snacks</button></li>
-                            <li><button onClick={() => handleCategoryClick('Cold Drink')} className="hover:text-brand-600 transition-colors text-left w-full">Cold Drinks & Juices</button></li>
+                            {categories.slice(0, 5).map(cat => (
+                                <li key={cat.id}>
+                                    <button 
+                                        onClick={() => handleCategoryClick(cat.id)} 
+                                        className="hover:text-brand-600 transition-colors text-left w-full truncate"
+                                    >
+                                        {cat.name}
+                                    </button>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                     <div>
